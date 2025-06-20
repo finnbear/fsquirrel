@@ -1,4 +1,8 @@
-use std::{ffi::OsStr, io, path::Path};
+use std::{
+    ffi::OsStr,
+    io::{self, Error, ErrorKind},
+    path::Path,
+};
 
 /// Gets an extensible file attribute by name.
 pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Option<Vec<u8>>> {
@@ -24,8 +28,8 @@ pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Opti
         }
     });
 
-    #[cfg(not(any(unix, windows)))]
-    return Err(Error::new(ErrorKind::Unsupported, "unsupported OS"));
+    #[allow(unreachable_code)]
+    Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
 /// Sets an extensible file attribute by name by creating or overwriting.
@@ -61,8 +65,8 @@ pub fn set<P: AsRef<Path>, N: AsRef<OsStr>, V: AsRef<[u8]>>(
         Ok(())
     });
 
-    #[cfg(not(any(unix, windows)))]
-    return Err(Error::new(ErrorKind::Unsupported, "unsupported OS"));
+    #[allow(unreachable_code)]
+    Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
 /// Removes an extensible file attribute by name.
@@ -78,8 +82,8 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
     #[cfg(windows)]
     return with_ads_path(path, name, |ads_path| std::fs::remove_file(ads_path));
 
-    #[cfg(not(any(unix, windows)))]
-    return Err(Error::new(ErrorKind::Unsupported, "unsupported OS"));
+    #[allow(unreachable_code)]
+    Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
 // Re-use a buffer for efficiency.
