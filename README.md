@@ -1,5 +1,7 @@
 # fsquirrel
 
+[![Documentation](https://docs.rs/fsquirrel/badge.svg)](https://docs.rs/fsquirrel)
+[![crates.io](https://img.shields.io/crates/v/fsquirrel.svg)](https://crates.io/crates/fsquirrel)
 [![Build](https://github.com/finnbear/fsquirrel/actions/workflows/build.yml/badge.svg)](https://github.com/finnbear/fsquirrel/actions/workflows/build.yml) 
 
 A small library for stashing custom [extended attribute](https://en.wikipedia.org/wiki/Extended_file_attributes) key-value pairs into file metadata.

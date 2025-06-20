@@ -3,6 +3,9 @@ name = "fsquirrel"
 authors = ["Finn Bear"]
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/finnbear/fsquirrel/"
+description = "fsquirrel is a cross-platform get/set extended file attributes"
 
 [dependencies]
 
