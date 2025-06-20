@@ -88,7 +88,7 @@ fn with_buffer<R>(inner: impl Fn(&mut std::ffi::OsString) -> R) -> R {
     thread_local! {
         // `OsString::new` isn't currently const, so use `Option`.
         static BUFFER: std::cell::RefCell<Option<std::ffi::OsString>>
-            = std::cell::RefCell::new(None);
+            = const { std::cell::RefCell::new(None) };
     }
 
     BUFFER.with(|buffer| {

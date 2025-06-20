@@ -1,29 +1,36 @@
-use std::ffi::OsString;
-use tempfile::NamedTempFile;
+use std::{ffi::OsString, fs};
+use tempfile::{NamedTempFile, TempDir};
 
 #[test]
 fn str_test() {
     let file = NamedTempFile::new().unwrap();
     let path = file.path();
 
-    let key_1 = String::from("key");
-    let value_1 = "hello".repeat(32);
+    let key = String::from("key");
+    let value = "hello".repeat(32);
 
-    let key_1 = key_1.as_str();
-    let value_1 = value_1.as_bytes();
+    let key = key.as_str();
+    let value = value.as_bytes();
 
     // Make sure these compile.
-    let _ = fsquirrel::get(path, key_1).unwrap();
-    fsquirrel::set(path, key_1, value_1).unwrap();
-    fsquirrel::remove(path, key_1).unwrap();
+    let _ = fsquirrel::get(path, key).unwrap();
+    fsquirrel::set(path, key, value).unwrap();
+    fsquirrel::remove(path, key).unwrap();
 }
 
 #[test]
 fn os_str_test() {
-    let file = NamedTempFile::new().unwrap();
-    let path = file.path();
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("file1.txt");
+    let path = &path;
 
-    for i in 0..109 {
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+
+    fs::write(path, "nothing to see here").unwrap();
+
+    for i in 0..100 {
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+
         let key = OsString::from(format!("key{i}"));
         let value = format!("hello{i}").repeat(32);
 
