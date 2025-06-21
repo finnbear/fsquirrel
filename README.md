@@ -6,7 +6,7 @@
 
 A small library for stashing custom [extended attribute](https://en.wikipedia.org/wiki/Extended_file_attributes) key-value pairs into file metadata.
 
-This attributes are preserved when files are `fs::copy`'d to a compatible file system, but discarded in cases such as uploading to the internet.
+These attributes are preserved when files are `fs::copy`'d to a compatible file system, but discarded in cases such as uploading to the internet.
 
 ## Platform support
 
