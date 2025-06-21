@@ -62,7 +62,7 @@ pub fn set<P: AsRef<Path>, N: AsRef<OsStr>, V: AsRef<[u8]>>(
 
     #[cfg(windows)]
     return {
-        if !std::fs::exists(path) {
+        if !std::fs::exists(path)? {
             // TOCTOU but the best we can do on Windows without fancy
             // winapi file opening that prevents deletion elsewhere.
             return Err(Error::new(ErrorKind::NotFound, "file does not exist"));
@@ -100,7 +100,7 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
 
     #[cfg(windows)]
     return {
-        if !std::fs::exists(path) {
+        if !std::fs::exists(path)? {
             // TOCTOU but the best we can do on Windows without fancy
             // winapi file opening that prevents deletion elsewhere.
             return Err(Error::new(ErrorKind::NotFound, "file does not exist"));
