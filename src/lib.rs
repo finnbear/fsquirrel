@@ -19,7 +19,11 @@ pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Opti
     #[cfg(windows)]
     return with_ads_path(path, name, |ads_path| {
         match std::fs::OpenOptions::new().read(true).open(ads_path) {
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            // TOCTOU but the best we can do on Windows without fancy
+            // winapi file opening that prevents deletion elsewhere.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound && std::fs::exists(path)? => {
+                Ok(None)
+            }
             Err(e) => Err(e),
             Ok(mut file) => {
                 use std::io::Read;
@@ -57,17 +61,24 @@ pub fn set<P: AsRef<Path>, N: AsRef<OsStr>, V: AsRef<[u8]>>(
     });
 
     #[cfg(windows)]
-    return with_ads_path(path, name, |ads_path| {
-        use std::io::Write;
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(ads_path)?;
-        file.write_all(value)?;
-        file.sync_all()?;
-        Ok(())
-    });
+    return {
+        if !std::fs::exists(path)? {
+            // TOCTOU but the best we can do on Windows without fancy
+            // winapi file opening that prevents deletion elsewhere.
+            return Err(Error::new(ErrorKind::NotFound, "file does not exist"));
+        }
+        with_ads_path(path, name, |ads_path| {
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(ads_path)?;
+            file.write_all(value)?;
+            file.sync_all()?;
+            Ok(())
+        })
+    };
 
     #[allow(unreachable_code)]
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
@@ -88,7 +99,14 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
     });
 
     #[cfg(windows)]
-    return with_ads_path(path, name, |ads_path| std::fs::remove_file(ads_path));
+    return {
+        if !std::fs::exists(path)? {
+            // TOCTOU but the best we can do on Windows without fancy
+            // winapi file opening that prevents deletion elsewhere.
+            return Err(Error::new(ErrorKind::NotFound, "file does not exist"));
+        }
+        with_ads_path(path, name, |ads_path| std::fs::remove_file(ads_path))
+    };
 
     #[allow(unreachable_code)]
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
