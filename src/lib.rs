@@ -4,7 +4,9 @@ use std::{
     path::Path,
 };
 
-/// Gets an extensible file attribute by name.
+/// Gets an extensible file attribute by `name`.
+///
+/// If `path` does not exist, a `NotFound` error is returned.
 pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Option<Vec<u8>>> {
     #[allow(unused)]
     let (path, name) = (path.as_ref(), name.as_ref());
@@ -34,7 +36,9 @@ pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Opti
 
 /// Sets an extensible file attribute by name by creating or overwriting.
 ///
-/// # Limits
+/// # Errors
+///
+/// If `path` does not exist, a `NotFound` error is returned.
 ///
 /// Each platform may impose a limit on number of attributes, length
 /// and validity of `name`, and length of `value`. An error will be
@@ -70,6 +74,10 @@ pub fn set<P: AsRef<Path>, N: AsRef<OsStr>, V: AsRef<[u8]>>(
 }
 
 /// Removes an extensible file attribute by name.
+///
+/// # Errors
+///
+/// If `path` does not exist, a `NotFound` error is returned.
 pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<()> {
     #[allow(unused)]
     let (path, name) = (path.as_ref(), name.as_ref());

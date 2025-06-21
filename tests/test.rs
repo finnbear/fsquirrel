@@ -1,5 +1,38 @@
-use std::{ffi::OsString, fs};
+use std::{ffi::OsString, fs, io::ErrorKind};
 use tempfile::{NamedTempFile, TempDir};
+
+#[test]
+fn not_found_test() {
+    let result = fsquirrel::get("does_not_exist_1", "foo");
+    assert!(
+        result
+            .as_ref()
+            .err()
+            .filter(|e| e.kind() == ErrorKind::NotFound)
+            .is_some(),
+        "{result:?}"
+    );
+
+    let result = fsquirrel::set("does_not_exist_2", "foo", "bar");
+    assert!(
+        result
+            .as_ref()
+            .err()
+            .filter(|e| e.kind() == ErrorKind::NotFound)
+            .is_some(),
+        "{result:?}"
+    );
+
+    let result = fsquirrel::remove("does_not_exist_3", "foo");
+    assert!(
+        result
+            .as_ref()
+            .err()
+            .filter(|e| e.kind() == ErrorKind::NotFound)
+            .is_some(),
+        "{result:?}"
+    );
+}
 
 #[test]
 fn str_test() {
