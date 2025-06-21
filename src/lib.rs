@@ -19,7 +19,10 @@ pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Opti
     #[cfg(windows)]
     return with_ads_path(path, name, |ads_path| {
         match std::fs::OpenOptions::new().read(true).open(ads_path) {
-            //Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            // TOCTOU but probably not harmful.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound && std::fs::exists(path)? => {
+                Ok(None)
+            }
             Err(e) => Err(e),
             Ok(mut file) => {
                 use std::io::Read;
