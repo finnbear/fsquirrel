@@ -78,8 +78,7 @@ fn os_str_test() {
         let result = fsquirrel::get(path, key);
         assert!(
             result.as_ref().unwrap().as_ref().unwrap() == value.as_bytes(),
-            "{:?}",
-            result
+            "{result:?}",
         );
 
         if i % 2 == 1 && i < 10 {
@@ -107,15 +106,15 @@ fn fs_copy_test() {
 
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
 
-    let key = OsString::from(format!("key"));
-    let value = format!("hello").repeat(32);
+    let key = OsString::from(String::from("key"));
+    let value = "hello".repeat(32);
 
     let key = &key;
     let value = &value;
 
     fsquirrel::set(path1, key, value).unwrap();
 
-    if false && cfg!(any(windows, target_vendor = "apple")) {
+    if cfg!(any(windows, target_vendor = "apple")) {
         fs::copy(path1, path2).unwrap();
     } else {
         assert!(Command::new("/usr/bin/cp")
@@ -132,7 +131,6 @@ fn fs_copy_test() {
     let result = fsquirrel::get(path2, key);
     assert!(
         result.as_ref().unwrap().as_ref().unwrap() == value.as_bytes(),
-        "{:?}",
-        result
+        "{result:?}",
     );
 }
