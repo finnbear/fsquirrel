@@ -71,7 +71,7 @@ fn os_str_test() {
         let value = &value;
 
         let result = fsquirrel::get(path, key);
-        assert!(result.as_ref().unwrap().is_none(), "{:?}", result);
+        assert!(result.as_ref().unwrap().is_none(), "{result:?}");
 
         fsquirrel::set(path, key, value).unwrap();
 
@@ -88,7 +88,7 @@ fn os_str_test() {
         fsquirrel::remove(path, key).unwrap();
 
         let result = fsquirrel::get(path, key);
-        assert!(result.as_ref().unwrap().is_none(), "{:?}", result);
+        assert!(result.as_ref().unwrap().is_none(), "{result:?}");
     }
 }
 
