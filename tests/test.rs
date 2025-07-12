@@ -1,4 +1,4 @@
-use std::{ffi::OsString, fs, io::ErrorKind};
+use std::{ffi::OsString, fs, io::ErrorKind, process::Command};
 use tempfile::{NamedTempFile, TempDir};
 
 #[test]
@@ -71,15 +71,14 @@ fn os_str_test() {
         let value = &value;
 
         let result = fsquirrel::get(path, key);
-        assert!(result.as_ref().unwrap().is_none(), "{:?}", result);
+        assert!(result.as_ref().unwrap().is_none(), "{result:?}");
 
         fsquirrel::set(path, key, value).unwrap();
 
         let result = fsquirrel::get(path, key);
         assert!(
             result.as_ref().unwrap().as_ref().unwrap() == value.as_bytes(),
-            "{:?}",
-            result
+            "{result:?}",
         );
 
         if i % 2 == 1 && i < 10 {
@@ -89,6 +88,49 @@ fn os_str_test() {
         fsquirrel::remove(path, key).unwrap();
 
         let result = fsquirrel::get(path, key);
-        assert!(result.as_ref().unwrap().is_none(), "{:?}", result);
+        assert!(result.as_ref().unwrap().is_none(), "{result:?}");
     }
+}
+
+#[test]
+fn fs_copy_test() {
+    let dir = TempDir::new().unwrap();
+    let path1 = dir.path().join("file1.txt");
+    let path1 = &path1;
+    let path2 = dir.path().join("file2.txt");
+    let path2 = &path2;
+
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+
+    fs::write(path1, "nothing to see here").unwrap();
+
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+
+    let key = OsString::from(String::from("key"));
+    let value = "hello".repeat(32);
+
+    let key = &key;
+    let value = &value;
+
+    fsquirrel::set(path1, key, value).unwrap();
+
+    if cfg!(any(windows, target_vendor = "apple")) {
+        fs::copy(path1, path2).unwrap();
+    } else {
+        assert!(Command::new("/usr/bin/cp")
+            .arg("--preserve=xattr")
+            .arg(path1)
+            .arg(path2)
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap()
+            .success());
+    }
+
+    let result = fsquirrel::get(path2, key);
+    assert!(
+        result.as_ref().unwrap().as_ref().unwrap() == value.as_bytes(),
+        "{result:?}",
+    );
 }

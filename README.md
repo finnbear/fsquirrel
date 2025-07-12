@@ -4,9 +4,11 @@
 [![crates.io](https://img.shields.io/crates/v/fsquirrel.svg)](https://crates.io/crates/fsquirrel)
 [![Build](https://github.com/finnbear/fsquirrel/actions/workflows/build.yml/badge.svg)](https://github.com/finnbear/fsquirrel/actions/workflows/build.yml) 
 
-A small library for stashing custom [extended attribute](https://en.wikipedia.org/wiki/Extended_file_attributes) key-value pairs into file metadata.
+A small library for stashing custom [extended attribute](https://en.wikipedia.org/wiki/Extended_file_attributes) key-value pairs into file metadata, avoiding the need for [sidecar files](https://en.wikipedia.org/wiki/Sidecar_file).
 
-These attributes are preserved when files are `fs::copy`'d to a compatible file system, but discarded in cases such as uploading to the internet.
+These attributes are may be preserved when files are copied to a compatible file system, but are always discarded in cases such as uploading to the internet. More specifically:
+- On Windows and MacOS, `fs::copy` can preserve them.
+- On Linux, only `/usr/bin/cp --preserve=xattr` can preserve them.
 
 ## Platform support
 
