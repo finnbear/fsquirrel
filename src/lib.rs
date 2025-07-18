@@ -122,6 +122,7 @@ pub struct Attributes {
     #[cfg(windows)]
     inner: std::iter::Filter<iter_windows::AttributesImpl, fn(&io::Result<OsString>) -> bool>,
     #[cfg(unix)]
+    #[allow(clippy::type_complexity)]
     inner: std::iter::FilterMap<xattr::XAttrs, fn(OsString) -> Option<io::Result<OsString>>>,
 }
 
