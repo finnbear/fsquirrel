@@ -139,7 +139,7 @@ pub fn list<P: AsRef<Path>>(path: P) -> io::Result<Attributes> {
         inner: iter_windows::AttributesImpl::new(path.as_ref())?,
         #[cfg(unix)]
         inner: xattr::list(path)?.filter_map(|s| {
-            const USER_NAMESPACE: &'static [u8] = b"user.";
+            const USER_NAMESPACE: &[u8] = b"user.";
             let bytes = s.as_encoded_bytes();
             if bytes.starts_with(USER_NAMESPACE) {
                 Some(

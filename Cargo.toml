@@ -8,7 +8,6 @@ repository = "https://github.com/finnbear/fsquirrel/"
 description = "fsquirrel is a cross-platform get/set extended file attributes"
 
 [dependencies]
-windows = { version = "0.56.0", features = ["Win32_Storage_FileSystem"] }
 
 [dev-dependencies]
 tempfile = "3.20.0"
