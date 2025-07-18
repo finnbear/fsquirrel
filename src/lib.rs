@@ -103,6 +103,9 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
 
     #[cfg(windows)]
     return {
+        if name.as_encoded_bytes().starts_with(b"$") {
+            return Err(Error::new(ErrorKind::PermissionDenied, "system stream"));
+        }
         if !std::fs::exists(path)? {
             // TOCTOU but the best we can do on Windows without fancy
             // winapi file opening that prevents deletion elsewhere.
@@ -117,32 +120,44 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
 
 pub struct Attributes {
     #[cfg(windows)]
-    inner: iter_windows::AttributesImpl,
+    inner: std::iter::Filter<iter_windows::AttributesImpl, fn(&io::Result<OsString>) -> bool>,
     #[cfg(unix)]
-    inner: std::iter::FilterMap<xattr::XAttrs, fn(OsString) -> Option<OsString>>,
+    inner: std::iter::FilterMap<xattr::XAttrs, fn(OsString) -> Option<io::Result<OsString>>>,
 }
 
 impl Iterator for Attributes {
     type Item = io::Result<OsString>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        #[cfg(windows)]
+        #[cfg(any(windows, unix))]
         return self.inner.next();
-        #[cfg(unix)]
-        self.inner.next().map(Ok)
+
+        #[allow(unreachable_code)]
+        {
+            unreachable!();
+        }
     }
 }
 
 pub fn list<P: AsRef<Path>>(path: P) -> io::Result<Attributes> {
-    Ok(Attributes {
+    #[cfg(any(windows, unix))]
+    return Ok(Attributes {
         #[cfg(windows)]
-        inner: iter_windows::AttributesImpl::new(path.as_ref())?,
+        inner: iter_windows::AttributesImpl::new(path.as_ref())?.filter(
+            |s: &io::Result<OsString>| {
+                if let Ok(s) = s {
+                    !s.as_encoded_bytes().starts_with(b"$")
+                } else {
+                    true
+                }
+            },
+        ),
         #[cfg(unix)]
         inner: xattr::list(path)?.filter_map(|s| {
             const USER_NAMESPACE: &[u8] = b"user.";
             let bytes = s.as_encoded_bytes();
             if bytes.starts_with(USER_NAMESPACE) {
-                Some(
+                Some(Ok(
                     // SAFETY: we split off a valid UTF-8 substring,
                     // so the remainder starts at the boundary of
                     // valid UTF-8.
@@ -152,12 +167,15 @@ pub fn list<P: AsRef<Path>>(path: P) -> io::Result<Attributes> {
                         )
                     }
                     .to_owned(),
-                )
+                ))
             } else {
                 None
             }
         }),
-    })
+    });
+
+    #[allow(unreachable_code)]
+    Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
 // Re-use a buffer for efficiency.
