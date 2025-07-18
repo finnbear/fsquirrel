@@ -9,7 +9,6 @@ use windows::{core::*, Win32::Foundation::*, Win32::Storage::FileSystem::*};
 pub(crate) struct AttributesImpl {
     handle: HANDLE,
     first: bool,
-    done: bool,
     find_data: WIN32_FIND_STREAM_DATA,
 }
 
@@ -35,7 +34,6 @@ impl AttributesImpl {
         Ok(Self {
             handle,
             first: true,
-            done: handle == INVALID_HANDLE_VALUE,
             find_data,
         })
     }
@@ -45,7 +43,7 @@ impl Iterator for AttributesImpl {
     type Item = io::Result<OsString>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.done {
+        if self.handle == INVALID_HANDLE_VALUE {
             return None;
         }
 
@@ -56,13 +54,15 @@ impl Iterator for AttributesImpl {
                     &mut self.find_data as *mut WIN32_FIND_STREAM_DATA as *mut _,
                 )
             } {
-                self.done = true;
-                if err.code() == ERROR_HANDLE_EOF.to_hresult() {
-                    return None;
-                } else {
-                    unsafe { FindClose(self.handle) };
-                    return Some(Err(io::Error::from_raw_os_error(err.code().0)));
+                unsafe {
+                    FindClose(self.handle);
                 }
+                self.handle = INVALID_HANDLE_VALUE;
+                return if err.code() == ERROR_HANDLE_EOF.to_hresult() {
+                    None
+                } else {
+                    Some(Err(io::Error::from_raw_os_error(err.code().0)))
+                };
             }
         } else {
             self.first = false;
@@ -83,7 +83,7 @@ impl Iterator for AttributesImpl {
 
 impl Drop for AttributesImpl {
     fn drop(&mut self) {
-        if self.handle != INVALID_HANDLE_VALUE && !self.done {
+        if self.handle != INVALID_HANDLE_VALUE {
             unsafe {
                 FindClose(self.handle);
             }
