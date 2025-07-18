@@ -21,7 +21,7 @@ On **Windows**, this uses [NTFS Alternate Data Streams](https://en.wikipedia.org
 - [x] Get 🕳️🌰🐿️
 - [x] Set 🐿️💨 🌰
 - [x] Remove 🌰🐿️💨 🕳️
-- [ ] List 🥜🌰🥔
+- [x] List 🥜🌰🥔
 
 ## License
 

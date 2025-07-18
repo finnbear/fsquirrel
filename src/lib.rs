@@ -1,10 +1,13 @@
 use std::{
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     io::{self, Error, ErrorKind},
     path::Path,
 };
 
-/// Gets an extensible file attribute by `name`.
+#[cfg(windows)]
+mod iter_windows;
+
+/// Gets an extended file attribute by `name`.
 ///
 /// If `path` does not exist, a `NotFound` error is returned.
 pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Option<Vec<u8>>> {
@@ -38,7 +41,7 @@ pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Opti
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
-/// Sets an extensible file attribute by name by creating or overwriting.
+/// Sets an extended file attribute by name by creating or overwriting.
 ///
 /// # Errors
 ///
@@ -84,7 +87,7 @@ pub fn set<P: AsRef<Path>, N: AsRef<OsStr>, V: AsRef<[u8]>>(
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
-/// Removes an extensible file attribute by name.
+/// Removes an extended file attribute by name.
 ///
 /// # Errors
 ///
@@ -107,6 +110,90 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
         }
         with_ads_path(path, name, |ads_path| std::fs::remove_file(ads_path))
     };
+
+    #[allow(unreachable_code)]
+    Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
+}
+
+pub struct Attributes {
+    #[cfg(windows)]
+    inner: std::iter::FilterMap<
+        iter_windows::AttributesImpl,
+        fn(io::Result<OsString>) -> Option<io::Result<OsString>>,
+    >,
+    #[cfg(unix)]
+    #[allow(clippy::type_complexity)]
+    inner: std::iter::FilterMap<xattr::XAttrs, fn(OsString) -> Option<io::Result<OsString>>>,
+}
+
+impl Iterator for Attributes {
+    type Item = io::Result<OsString>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        #[cfg(any(windows, unix))]
+        return self.inner.next();
+
+        #[allow(unreachable_code)]
+        {
+            unreachable!();
+        }
+    }
+}
+
+/// List extended file attribute names. This tries to skip
+/// extended attributes of the operating system.
+///
+/// # Errors
+///
+/// If `path` does not exist, a `NotFound` error is returned.
+pub fn list<P: AsRef<Path>>(path: P) -> io::Result<Attributes> {
+    #[cfg(any(windows, unix))]
+    {
+        let path = path.as_ref();
+
+        if !std::fs::exists(path)? {
+            // TOCTOU (TODO: can we do better?)
+            return Err(Error::new(ErrorKind::NotFound, "file does not exist"));
+        }
+
+        return Ok(Attributes {
+            #[cfg(windows)]
+            inner: iter_windows::AttributesImpl::new(path)?.filter_map(
+                |s: io::Result<OsString>| {
+                    Some(match s {
+                        Ok(s) => {
+                            let name = s
+                                .as_encoded_bytes()
+                                .strip_prefix(b":")?
+                                .strip_suffix(b":$DATA")?;
+
+                            if name.is_empty() {
+                                // The main stream.
+                                return None;
+                            }
+
+                            // SAFETY: we split off a valid UTF-8 substring,
+                            // so the remainder starts at the boundary of
+                            // valid UTF-8.
+                            Ok(unsafe { OsStr::from_encoded_bytes_unchecked(name) }.to_owned())
+                        }
+                        Err(e) => Err(e),
+                    })
+                },
+            ),
+            #[cfg(unix)]
+            inner: xattr::list(path)?.filter_map(|s| {
+                const USER_NAMESPACE: &[u8] = b"user.";
+                let name = s.as_encoded_bytes().strip_prefix(USER_NAMESPACE)?;
+                Some(Ok(
+                    // SAFETY: we split off a valid UTF-8 substring,
+                    // so the remainder starts at the boundary of
+                    // valid UTF-8.
+                    unsafe { OsStr::from_encoded_bytes_unchecked(name) }.to_owned(),
+                ))
+            }),
+        });
+    }
 
     #[allow(unreachable_code)]
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
@@ -150,7 +237,12 @@ fn with_ads_path<R>(path: &Path, name: &OsStr, inner: impl Fn(&OsStr) -> R) -> R
     with_buffer(|buffer| {
         buffer.push(path);
         buffer.push(":");
-        buffer.push(name);
+        let bytes = name.as_encoded_bytes();
+        // SAFETY: trimming off a UTF-8 substring means the remainder ends at
+        // a UTF-8 boundary.
+        buffer.push(unsafe {
+            OsStr::from_encoded_bytes_unchecked(bytes.strip_suffix(b":$DATA").unwrap_or(bytes))
+        });
         inner(buffer)
     })
 }

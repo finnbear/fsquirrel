@@ -1,4 +1,4 @@
-use std::{ffi::OsString, fs, io::ErrorKind, process::Command};
+use std::{collections::HashSet, ffi::OsString, fs, io::ErrorKind, process::Command};
 use tempfile::{NamedTempFile, TempDir};
 
 #[test]
@@ -49,6 +49,7 @@ fn str_test() {
     let _ = fsquirrel::get(path, key).unwrap();
     fsquirrel::set(path, key, value).unwrap();
     fsquirrel::remove(path, key).unwrap();
+    fsquirrel::list(path).unwrap();
 }
 
 #[test]
@@ -61,6 +62,7 @@ fn os_str_test() {
 
     fs::write(path, "nothing to see here").unwrap();
 
+    let mut expected_count = 0;
     for i in 0..100 {
         assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
 
@@ -73,7 +75,21 @@ fn os_str_test() {
         let result = fsquirrel::get(path, key);
         assert!(result.as_ref().unwrap().is_none(), "{result:?}");
 
+        let iter = fsquirrel::list(path).unwrap();
+        assert_eq!(
+            iter.map(|i| {
+                let os = i.unwrap();
+                let s = os.to_str().unwrap();
+                s.strip_prefix("key").expect(s).parse::<usize>().expect(s);
+                os
+            })
+            .collect::<HashSet<_>>()
+            .len(),
+            expected_count
+        );
+
         fsquirrel::set(path, key, value).unwrap();
+        expected_count += 1;
 
         let result = fsquirrel::get(path, key);
         assert!(
@@ -86,6 +102,7 @@ fn os_str_test() {
         }
 
         fsquirrel::remove(path, key).unwrap();
+        expected_count -= 1;
 
         let result = fsquirrel::get(path, key);
         assert!(result.as_ref().unwrap().is_none(), "{result:?}");
