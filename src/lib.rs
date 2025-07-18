@@ -1,8 +1,11 @@
 use std::{
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     io::{self, Error, ErrorKind},
     path::Path,
 };
+
+#[cfg(windows)]
+mod iter_windows;
 
 /// Gets an extensible file attribute by `name`.
 ///
@@ -110,6 +113,51 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
 
     #[allow(unreachable_code)]
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
+}
+
+pub struct Attributes {
+    #[cfg(windows)]
+    inner: iter_windows::AttributesImpl,
+    #[cfg(unix)]
+    inner: std::iter::FilterMap<xattr::XAttrs, fn(OsString) -> Option<OsString>>,
+}
+
+impl Iterator for Attributes {
+    type Item = io::Result<OsString>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        #[cfg(windows)]
+        return self.inner.next();
+        #[cfg(unix)]
+        self.inner.next().map(Ok)
+    }
+}
+
+pub fn list<P: AsRef<Path>>(path: P) -> io::Result<Attributes> {
+    Ok(Attributes {
+        #[cfg(windows)]
+        inner: iter_windows::AttributesImpl::new(path.as_ref())?,
+        #[cfg(unix)]
+        inner: xattr::list(path)?.filter_map(|s| {
+            const USER_NAMESPACE: &'static [u8] = b"user.";
+            let bytes = s.as_encoded_bytes();
+            if bytes.starts_with(USER_NAMESPACE) {
+                Some(
+                    // SAFETY: we split off a valid UTF-8 substring,
+                    // so the remainder starts at the boundary of
+                    // valid UTF-8.
+                    unsafe {
+                        OsStr::from_encoded_bytes_unchecked(
+                            &bytes[USER_NAMESPACE.len()..bytes.len()],
+                        )
+                    }
+                    .to_owned(),
+                )
+            } else {
+                None
+            }
+        }),
+    })
 }
 
 // Re-use a buffer for efficiency.
