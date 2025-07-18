@@ -103,9 +103,6 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
 
     #[cfg(windows)]
     return {
-        if name.as_encoded_bytes().starts_with(b"$") {
-            return Err(Error::new(ErrorKind::PermissionDenied, "system stream"));
-        }
         if !std::fs::exists(path)? {
             // TOCTOU but the best we can do on Windows without fancy
             // winapi file opening that prevents deletion elsewhere.
@@ -240,7 +237,12 @@ fn with_ads_path<R>(path: &Path, name: &OsStr, inner: impl Fn(&OsStr) -> R) -> R
     with_buffer(|buffer| {
         buffer.push(path);
         buffer.push(":");
-        buffer.push(name);
+        let bytes = name.as_encoded_bytes();
+        // SAFETY: trimming off a UTF-8 substring means the remainder ends at
+        // a UTF-8 boundary.
+        buffer.push(unsafe {
+            OsStr::from_encoded_bytes_unchecked(bytes.strip_suffix(b":$DATA").unwrap_or(bytes))
+        });
         inner(buffer)
     })
 }
