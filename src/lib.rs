@@ -7,7 +7,7 @@ use std::{
 #[cfg(windows)]
 mod iter_windows;
 
-/// Gets an extensible file attribute by `name`.
+/// Gets an extended file attribute by `name`.
 ///
 /// If `path` does not exist, a `NotFound` error is returned.
 pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Option<Vec<u8>>> {
@@ -41,7 +41,7 @@ pub fn get<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<Opti
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
-/// Sets an extensible file attribute by name by creating or overwriting.
+/// Sets an extended file attribute by name by creating or overwriting.
 ///
 /// # Errors
 ///
@@ -87,7 +87,7 @@ pub fn set<P: AsRef<Path>, N: AsRef<OsStr>, V: AsRef<[u8]>>(
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
-/// Removes an extensible file attribute by name.
+/// Removes an extended file attribute by name.
 ///
 /// # Errors
 ///
@@ -143,7 +143,18 @@ impl Iterator for Attributes {
     }
 }
 
+/// List extended file attribute names. This tries to skip
+/// extended attributes of the operating system.
+///
+/// # Errors
+///
+/// If `path` does not exist, a `NotFound` error is returned.
 pub fn list<P: AsRef<Path>>(path: P) -> io::Result<Attributes> {
+    if !std::fs::exists(path)? {
+        // TOCTOU (TODO: can we do better?)
+        return Err(Error::new(ErrorKind::NotFound, "file does not exist"));
+    }
+
     #[cfg(any(windows, unix))]
     return Ok(Attributes {
         #[cfg(windows)]
