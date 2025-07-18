@@ -1,4 +1,4 @@
-use std::{ffi::OsString, fs, io::ErrorKind, process::Command};
+use std::{collections::HashSet, ffi::OsString, fs, io::ErrorKind, process::Command};
 use tempfile::{NamedTempFile, TempDir};
 
 #[test]
@@ -76,16 +76,17 @@ fn os_str_test() {
         assert!(result.as_ref().unwrap().is_none(), "{result:?}");
 
         let iter = fsquirrel::list(path).unwrap();
-        //assert_eq!(
-        iter.inspect(|i| {
-            let s = i.as_ref().unwrap();
-            let s = s.to_str().unwrap();
-            println!("{s}");
-            //s.strip_prefix("key").expect(s).parse::<usize>().expect(s);
-        })
-        .count(); //,
-                  //    expected_count
-                  //);
+        assert_eq!(
+            iter.map(|i| {
+                let os = i.unwrap();
+                let s = os.to_str().unwrap();
+                s.strip_prefix("key").expect(s).parse::<usize>().expect(s);
+                os
+            })
+            .collect::<HashSet<_>>()
+            .len(),
+            expected_count
+        );
 
         fsquirrel::set(path, key, value).unwrap();
         expected_count += 1;
