@@ -151,6 +151,7 @@ pub fn list<P: AsRef<Path>>(path: P) -> io::Result<Attributes> {
     {
         let path = path.as_ref();
 
+        #[cfg(windows)]
         if !std::fs::exists(path)? {
             // TOCTOU (TODO: can we do better?)
             return Err(Error::new(ErrorKind::NotFound, "file does not exist"));
