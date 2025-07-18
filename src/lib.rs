@@ -115,6 +115,7 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
     Err(Error::new(ErrorKind::Unsupported, "unsupported OS"))
 }
 
+/// An iterator over the extended attributes of a file.
 pub struct Attributes {
     #[cfg(windows)]
     inner: std::iter::FilterMap<
