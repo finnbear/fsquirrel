@@ -120,7 +120,10 @@ pub fn remove<P: AsRef<Path>, N: AsRef<OsStr>>(path: P, name: N) -> io::Result<(
 
 pub struct Attributes {
     #[cfg(windows)]
-    inner: std::iter::Filter<iter_windows::AttributesImpl, fn(&io::Result<OsString>) -> bool>,
+    inner: std::iter::FilterMap<
+        iter_windows::AttributesImpl,
+        fn(io::Result<OsString>) -> Option<io::Result<OsString>>,
+    >,
     #[cfg(unix)]
     #[allow(clippy::type_complexity)]
     inner: std::iter::FilterMap<xattr::XAttrs, fn(OsString) -> Option<io::Result<OsString>>>,
@@ -144,34 +147,39 @@ pub fn list<P: AsRef<Path>>(path: P) -> io::Result<Attributes> {
     #[cfg(any(windows, unix))]
     return Ok(Attributes {
         #[cfg(windows)]
-        inner: iter_windows::AttributesImpl::new(path.as_ref())?.filter(
-            |s: &io::Result<OsString>| {
-                if let Ok(s) = s {
-                    !s.as_encoded_bytes().starts_with(b"$")
-                } else {
-                    true
-                }
+        inner: iter_windows::AttributesImpl::new(path.as_ref())?.filter_map(
+            |s: io::Result<OsString>| {
+                Some(match s {
+                    Ok(s) => {
+                        let name = s
+                            .as_encoded_bytes()
+                            .strip_prefix(b":")?
+                            .strip_suffix(b":$DATA")?;
+
+                        if name.is_empty() {
+                            // The main stream.
+                            return None;
+                        }
+
+                        // SAFETY: we split off a valid UTF-8 substring,
+                        // so the remainder starts at the boundary of
+                        // valid UTF-8.
+                        Ok(unsafe { OsStr::from_encoded_bytes_unchecked(name) }.to_owned())
+                    }
+                    Err(e) => Err(e),
+                })
             },
         ),
         #[cfg(unix)]
         inner: xattr::list(path)?.filter_map(|s| {
             const USER_NAMESPACE: &[u8] = b"user.";
-            let bytes = s.as_encoded_bytes();
-            if bytes.starts_with(USER_NAMESPACE) {
-                Some(Ok(
-                    // SAFETY: we split off a valid UTF-8 substring,
-                    // so the remainder starts at the boundary of
-                    // valid UTF-8.
-                    unsafe {
-                        OsStr::from_encoded_bytes_unchecked(
-                            &bytes[USER_NAMESPACE.len()..bytes.len()],
-                        )
-                    }
-                    .to_owned(),
-                ))
-            } else {
-                None
-            }
+            let name = s.as_encoded_bytes().strip_prefix(USER_NAMESPACE)?;
+            Some(Ok(
+                // SAFETY: we split off a valid UTF-8 substring,
+                // so the remainder starts at the boundary of
+                // valid UTF-8.
+                unsafe { OsStr::from_encoded_bytes_unchecked(name) }.to_owned(),
+            ))
         }),
     });
 
